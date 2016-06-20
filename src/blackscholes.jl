@@ -11,11 +11,11 @@ using Base.Threads
     return out
 end
 
-function blackscholes_serial(sptprice::Array{Float64,1},
+function blackscholes_serial(sptprice::Float64,
                            strike::Array{Float64,1},
-                           rate::Array{Float64,1},
-                           volatility::Array{Float64,1},
-                           time::Array{Float64,1})
+                           rate::Float64,
+                           volatility::Float64,
+                           time::Float64)
     logterm = log10(sptprice ./ strike)
     powterm = .5 .* volatility .* volatility
     den = volatility .* sqrt(time)
@@ -33,32 +33,36 @@ end
 # It devectorizes the entire loop. We're now looping through arrays instead of dealing with them in blocks like we did previously. This is devectorized code while the above serial block is vectorized code. 
 # Affixes the `@threads` macro in front of the `for` to tell Julia that this is a multi-threaded block.
 
-function blackscholes_parallel(sptprice::Vector{Float64}, strike::Vector{Float64}, rate::Vector{Float64}, volatility::Vector{Float64}, time::Vector{Float64})
+function blackscholes_parallel(sptprice::Float64, 
+				strike::Vector{Float64}, 
+				rate::Float64, 
+				volatility::Float64, 
+				time::Float64)
     sqt = sqrt(time)
     put = similar(strike)
-    @threads for i = 1:size(sptprice, 1)
-        logterm = log10(sptprice[i] / strike[i])
-        powterm = 0.5 * volatility[i] * volatility[i]
-        den = volatility[i] * sqt[i]
-        d1 = (((rate[i] + powterm) * time[i]) + logterm) / den
+    @threads for i = 1:size(strike, 1)
+        logterm = log10(sptprice / strike[i])
+        powterm = 0.5 * volatility * volatility
+        den = volatility * sqt
+        d1 = (((rate + powterm) * time) + logterm) / den
         d2 = d1 - den
         NofXd1 = 0.5 + 0.5 * erf(0.707106781 * d1)
         NofXd2 = 0.5 + 0.5 * erf(0.707106781 * d2)
-        futureValue = strike[i] * exp(-rate[i] * time[i])
+        futureValue = strike[i] * exp(-rate * time)
         c1 = futureValue * NofXd2
-        call = sptprice[i] * NofXd1 - c1
-        put[i] = call - futureValue + sptprice[i]
+        call_ = sptprice * NofXd1 - c1
+        put[i] = call_ - futureValue + sptprice
     end
     put
 end
 
 
 function run(iterations)
-    sptprice   = Float64[ 42.0 for i = 1:iterations ]
+    sptprice   = 42.0 
     initStrike = Float64[ 40.0 + (i / iterations) for i = 1:iterations ]
-    rate       = Float64[ 0.5 for i = 1:iterations ]
-    volatility = Float64[ 0.2 for i = 1:iterations ]
-    time       = Float64[ 0.5 for i = 1:iterations ]
+    rate       = 0.5 
+    volatility = 0.2 
+    time       = 0.5 
 
     tic()
     put1 = blackscholes_serial(sptprice, initStrike, rate, volatility, time)
@@ -75,8 +79,8 @@ function driver()
     srand(0)
     tic()
     iterations = 10^6
-    blackscholes_serial(Float64[], Float64[], Float64[], Float64[], Float64[])
-    blackscholes_parallel(Float64[], Float64[], Float64[], Float64[], Float64[])
+    blackscholes_serial(0., Float64[], 0., 0., 0.)
+    blackscholes_parallel(0., Float64[], 0., 0., 0.)
     println("SELFPRIMED ", toq())
     tserial, tparallel = run(iterations)
     println("Time taken for serial = $tserial")
